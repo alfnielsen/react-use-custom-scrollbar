@@ -1,15 +1,15 @@
 // https://codesandbox.io/s/confident-sea-u3cim?file=/src/useCustomScroll.tsx:0-3682
-
-import React, { FC, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useLayoutEffect } from "react";
 
 interface IUseCustomScroll {
   ref: React.RefObject<HTMLDivElement>;
 }
 
-export function useCustomScrollbar({ ref }: IUseCustomScroll) {
+export function useCustomScroll({ ref }: IUseCustomScroll) {
   useLayoutEffect(() => {
     if (!ref.current) return;
     const elm = ref.current;
+    // setup elms:
     const scrollBarElm = document.createElement("div");
     scrollBarElm.style.position = "absolute";
     scrollBarElm.style.right = "0px";
@@ -21,7 +21,6 @@ export function useCustomScrollbar({ ref }: IUseCustomScroll) {
     scrollBarElm.style.borderRadius = "4px";
 
     const scrollElm = document.createElement("div");
-
     scrollElm.style.position = "absolute";
     scrollElm.style.right = "0px";
     scrollElm.style.top = "0px";
@@ -31,6 +30,10 @@ export function useCustomScrollbar({ ref }: IUseCustomScroll) {
     scrollElm.style.background = "rgba(99,99,99,0.7)";
     scrollElm.style.borderRadius = "4px";
     scrollBarElm.appendChild(scrollElm);
+
+    elm.appendChild(scrollBarElm);
+
+    // setup handlers ("DRAW")
     const userSelect = elm.style.userSelect;
     let mdy = 0;
     let drag = false;
@@ -49,7 +52,6 @@ export function useCustomScrollbar({ ref }: IUseCustomScroll) {
         document.removeEventListener("mousemove", handlers.move);
         document.removeEventListener("mouseup", handlers.stop);
         scrollElm.addEventListener("mousedown", handlers.start);
-        //elm.addEventListener("scroll", handlers.scroll);
         elm.style.userSelect = userSelect;
       },
       move(ev: MouseEvent) {
@@ -66,7 +68,7 @@ export function useCustomScrollbar({ ref }: IUseCustomScroll) {
         scrollBarElm.style.top = elm.scrollTop + "px";
         scrollBarElm.style.height = elm.clientHeight + "px";
       },
-      scroll(ev: Event) {
+      scroll() {
         scrollBarElm.style.top = elm.scrollTop + "px";
         scrollBarElm.style.height = elm.clientHeight + "px";
         if (drag) return true;
@@ -84,21 +86,33 @@ export function useCustomScrollbar({ ref }: IUseCustomScroll) {
         return true;
       }
     };
-    scrollElm.addEventListener("mousedown", handlers.start);
 
     elm.style.position = "relative";
     elm.style.boxSizing = "border-box";
-    elm.appendChild(scrollBarElm);
     const hh = elm.scrollHeight - elm.clientHeight;
     if (hh === 0) {
       scrollElm.style.display = "none";
     } else {
       scrollElm.style.display = "block";
     }
-
+    // "DRAW" on scroll, resize and child mutations:
     elm.addEventListener("scroll", handlers.scroll);
+    elm.addEventListener("resize", () => handlers.scroll);
+    scrollElm.addEventListener("mousedown", handlers.start);
+    // observer adding/removing children:
+    const observer = new MutationObserver(handlers.scroll);
+    const config = { attributes: true, childList: true, subtree: true };
+    observer.observe(elm, config);
+
     return () => {
+      // clean up (onmount):
       elm.removeEventListener("scroll", handlers.scroll);
+      elm.removeEventListener("resize", handlers.scroll);
+      scrollElm.removeEventListener("mousedown", handlers.start);
+      document.removeEventListener("mousemove", handlers.move);
+      document.removeEventListener("mouseup", handlers.stop);
+      observer.disconnect();
+      elm.removeChild(scrollBarElm);
     };
   }, [ref]);
 
